@@ -21,6 +21,7 @@ References:
    - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
 */
 
+var rest = require('restler');
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
@@ -38,6 +39,9 @@ var assertFileExists = function(infile) {
 
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
+};
+var cheerioString = function(str) {
+    return cheerio.load(str);
 };
 
 var loadChecks = function(checksfile) {
@@ -61,14 +65,37 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var checkUrl = function(urlPath, checksfile, processCallback) {
+    rest.get(urlPath).on('complete', function(data) {
+        $ = cheerioString(data);
+        var checks = loadChecks(checksfile).sort();
+        var out = {};
+        for(var ii in checks) {
+            var present = $(checks[ii]).length > 0;
+            out[checks[ii]] = present;
+        }
+        processCallback(out);
+    });    
+};
+var outJson = function(checkJson) {
+    var outJson = JSON.stringify(checkJson, null, 4);
+    console.log(outJson);
+}
+
 if(require.main == module) {
+    program
+        .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
+        .option('-u, --url <url_path>', 'The url to check')
+        .parse(process.argv);
+    checkUrl(program.url, program.checks, outJson);
+/*
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
         .parse(process.argv);
     var checkJson = checkHtmlFile(program.file, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    console.log(outJson);*/
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
